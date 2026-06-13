@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maßband-Challenge V3</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p>Verbinde mit Firestore…</p>
+</div>
+
+<!-- Password Modal -->
+<div class="modal-bg hidden" id="pw-modal">
+  <div class="modal">
+    <div style="font-size:1.8rem;margin-bottom:10px">🔐</div>
+    <h2>Admin-Bereich</h2>
+    <p>Bitte Passwort eingeben</p>
+    <input type="password" id="pw-input" placeholder="••••••••" />
+    <div class="pw-err hidden" id="pw-err">Falsches Passwort</div>
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:center">
+      <button class="btn-gold" id="pw-submit">Entsperren</button>
+      <button class="btn-ghost" id="pw-cancel">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div id="toasts"></div>
+
+<!-- Topbar -->
+<div class="topbar">
+  <button class="btn-gold" id="nav-board">🏆 Bestenliste</button>
+  <button class="btn-ghost" id="nav-admin">🔒 Admin-Bereich</button>
+</div>
+
+<!-- ══ LEADERBOARD ══════════════════════════════════════════════ -->
+<div id="view-board" class="container hidden">
+  <div class="hero">
+    <h1>📏 Maßband-Challenge</h1>
+    <p>100 Tage Countdown • Erlöse finanzieren Rabatte auf Abiballkarten</p>
+  </div>
+
+  <div class="countdown-bar">
+    <div>
+      <div class="cd-days" id="cd-days">—</div>
+      <div class="cd-label">Tage</div>
+    </div>
+    <div class="bar-wrap">
+      <div class="muted" style="margin-bottom:6px;font-size:12px">Verbleibend bis zum Abitur</div>
+      <div class="progress-track">
+        <div class="progress-fill" id="cd-fill" style="width:0%"></div>
+      </div>
+      <div class="bar-meta">
+        <span>Start: 21.01.2026</span>
+        <span id="cd-end"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card stat-gold">
+      <div class="stat-label">Gesamtschaden (Pot)</div>
+      <div class="stat-value" id="s-pot">0,00 €</div>
+    </div>
+    <div class="stat-card stat-green">
+      <div class="stat-label">Bereits eingezahlt</div>
+      <div class="stat-value" id="s-paid">0,00 €</div>
+    </div>
+    <div class="stat-card stat-red">
+      <div class="stat-label">Offene Beträge</div>
+      <div class="stat-value" id="s-open">0,00 €</div>
+    </div>
+  </div>
+
+  <div class="board-header">
+    <h2>Rangliste</h2>
+    <select id="sort-sel">
+      <option value="open">Offene Schulden</option>
+      <option value="total">Gesamtschaden</option>
+      <option value="paid">Eingezahlt</option>
+      <option value="name">Name A–Z</option>
+    </select>
+  </div>
+  <div id="board-list">
+    <div class="empty-state">
+      <div class="empty-icon">📋</div>
+      <p>Noch keine Einträge. Importiere den WhatsApp-Chat im Admin-Bereich.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADMIN ════════════════════════════════════════════════════ -->
+<div id="view-admin" class="container hidden">
+  <div class="flex-between" style="margin-bottom:16px">
+    <h2 style="color:var(--gold)">⚙️ Admin-Bereich</h2>
+    <button class="btn-ghost" id="admin-back">← Zur Bestenliste</button>
+  </div>
+
+  <div class="admin-tabs">
+    <button class="tab-btn active" data-tab="import">📤 Chat-Import</button>
+    <button class="tab-btn" data-tab="quick">➕ Quick-Add</button>
+    <button class="tab-btn" data-tab="ledger">📒 Hauptbuch</button>
+    <button class="tab-btn" data-tab="persons">👥 Teilnehmer</button>
+    <button class="tab-btn" data-tab="settings">⚙️ Einstellungen</button>
+  </div>
+
+  <!-- IMPORT -->
+  <div class="tab-pane active" id="tab-import">
+    <div class="card">
+      <h3>WhatsApp-Chat (.txt) hochladen</h3>
+      <div class="upload-zone" id="upload-zone">
+        <div class="uz-icon">📂</div>
+        <p><strong>Datei ablegen</strong> oder klicken zum Auswählen</p>
+        <p style="font-size:11px;margin-top:4px;color:var(--muted)">WhatsApp-Export .txt</p>
+      </div>
+      <input type="file" id="file-inp" accept=".txt" class="hidden" />
+    </div>
+    <div class="card hidden" id="staging-card">
+      <div class="flex-between" style="margin-bottom:12px">
+        <h3 style="margin:0">Vorschau — <span id="stg-count">0</span> Einträge</h3>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="muted" id="stg-stats"></span>
+          <button class="btn-ghost btn-sm" id="stg-clear">Verwerfen</button>
+          <button class="btn-success btn-sm" id="stg-confirm">✓ Importieren</button>
+        </div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>Datum</th><th>Roh-Text</th><th>Person</th><th>Betrag</th><th>Status</th><th>Skip</th></tr>
+          </thead>
+          <tbody id="stg-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUICK ADD -->
+  <div class="tab-pane hidden" id="tab-quick">
+    <div class="card">
+      <h3>Strafe manuell eintragen</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Person</label>
+          <select id="qa-person"><option value="">— wählen —</option></select>
+        </div>
+        <div class="form-group">
+          <label>Vergehen</label>
+          <select id="qa-reason">
+            <option value="">— wählen —</option>
+            <option value="Zu spät gezeigt" data-amt="2">Zu spät gezeigt / nicht in 1 Min vorzeigbar (2€)</option>
+            <option value="Vergessen abzuschneiden" data-amt="2">Vergessen abzuschneiden (2€)</option>
+            <option value="Schief abschneiden" data-amt="1">Schief abschneiden (1€)</option>
+            <option value="Zuhause vergessen" data-amt="5">Zuhause vergessen (5€)</option>
+            <option value="Verloren" data-amt="20">Verloren (20€)</option>
+            <option value="Aussteigen" data-amt="20">Aussteigen (20€)</option>
+            <option value="Klauen / Kaputt machen" data-amt="25">Klauen / Kaputt machen (25€)</option>
+            <option value="Sonstiges" data-amt="">Sonstiges</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Betrag (€)</label>
+          <input type="number" id="qa-amt" step="0.5" min="0" placeholder="2.00" />
+        </div>
+        <div class="form-group">
+          <label>Datum</label>
+          <input type="date" id="qa-date" />
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Kommentar (optional)</label>
+          <input type="text" id="qa-note" placeholder="z.B. 1-Minuten-Regel nicht eingehalten" />
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-gold" id="qa-submit">Strafe speichern</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Zahlung erfassen</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Person</label>
+          <select id="pay-person"><option value="">— wählen —</option></select>
+        </div>
+        <div class="form-group">
+          <label>Betrag (€)</label>
+          <input type="number" id="pay-amt" step="0.5" min="0" placeholder="0.00" />
+        </div>
+        <div class="form-group">
+          <label>Datum</label>
+          <input type="date" id="pay-date" />
+        </div>
+        <div class="form-group">
+          <label>Notiz (optional)</label>
+          <input type="text" id="pay-note" placeholder="z.B. Bar erhalten" />
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-success" id="pay-submit">Zahlung speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEDGER -->
+  <div class="tab-pane hidden" id="tab-ledger">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <input type="text" id="ldg-search" placeholder="Suchen…" style="width:200px" />
+      <select id="ldg-filter">
+        <option value="all">Alle</option>
+        <option value="PENALTY">Nur Strafen</option>
+        <option value="PAYMENT">Nur Zahlungen</option>
+      </select>
+      <span class="muted" id="ldg-count" style="margin-left:auto"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>Datum</th><th>Person</th><th>Typ</th><th>Betrag</th><th>Grund</th><th>Quelle</th><th></th></tr>
+        </thead>
+        <tbody id="ldg-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PERSONS -->
+  <div class="tab-pane hidden" id="tab-persons">
+    <div class="card">
+      <h3>Person hinzufügen</h3>
+      <p class="muted" style="margin-bottom:12px">
+        Die Jahrgangsliste (<code>data/jahrgangsliste.csv</code>) dient als Matching-Basis.
+        Hier kannst du zusätzliche Personen (Lehrer, Gäste) eintragen.
+      </p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Name (Vor- und Nachname)</label>
+          <input type="text" id="np-name" placeholder="Frau Regus" />
+        </div>
+        <div class="form-group">
+          <label>Typ</label>
+          <select id="np-type">
+            <option value="student">Schüler/in</option>
+            <option value="teacher">Lehrkraft</option>
+            <option value="guest">Gast</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Spitznamen / Aliase (kommagetrennt)</label>
+          <input type="text" id="np-aliases" placeholder="z.B. Frau Regus, Regus" />
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-gold" id="np-submit">Hinzufügen</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Mapping-Wörterbuch</h3>
+      <p class="muted" style="margin-bottom:12px">
+        Einmal bestätigte Spitznamen werden hier gespeichert und beim nächsten Import automatisch erkannt.
+      </p>
+      <div id="mapping-list"></div>
+      <div class="divider"></div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Alias / Spitzname</label>
+          <input type="text" id="new-alias" placeholder="z.B. Gritschi" />
+        </div>
+        <div class="form-group">
+          <label>Person</label>
+          <select id="alias-person"><option value="">— wählen —</option></select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-outline" id="alias-submit">Mapping speichern</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Alle Teilnehmer (<span id="persons-count">0</span>)</h3>
+      <div id="persons-list"></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="tab-pane hidden" id="tab-settings">
+    <div class="card">
+      <h3>Abi-Datum</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Erstes Abitur-Prüfungsdatum</label>
+          <input type="date" id="abi-date-inp" value="2026-04-28" />
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-gold" id="abi-save">Speichern</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Admin-Passwort ändern</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Neues Passwort</label>
+          <input type="password" id="new-pw1" placeholder="Neues Passwort" />
+        </div>
+        <div class="form-group">
+          <label>Bestätigen</label>
+          <input type="password" id="new-pw2" placeholder="Wiederholen" />
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-outline" id="pw-change">Passwort ändern</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Strafenkatalog</h3>
+      <table>
+        <thead><tr><th>Vergehen</th><th>Betrag</th></tr></thead>
+        <tbody>
+          <tr><td>Zu spät gezeigt / nicht in 1 Min vorzeigbar</td><td style="color:var(--red);font-weight:600">2,00 €</td></tr>
+          <tr><td>Vergessen abzuschneiden</td><td style="color:var(--red);font-weight:600">2,00 €</td></tr>
+          <tr><td>Schief abschneiden</td><td style="color:var(--red);font-weight:600">1,00 €</td></tr>
+          <tr><td>Zuhause vergessen</td><td style="color:var(--red);font-weight:600">5,00 €</td></tr>
+          <tr><td>Verloren</td><td style="color:var(--red);font-weight:600">20,00 €</td></tr>
+          <tr><td>Aussteigen</td><td style="color:var(--red);font-weight:600">20,00 €</td></tr>
+          <tr><td>Maßband klauen / kaputt machen</td><td style="color:var(--red);font-weight:600">25,00 €</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Daten exportieren</h3>
+      <div class="form-actions">
+        <button class="btn-outline" id="export-csv">📥 Teilnehmer CSV</button>
+        <button class="btn-outline" id="export-json">📥 Alle Daten JSON</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
