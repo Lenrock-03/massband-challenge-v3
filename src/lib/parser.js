@@ -1,7 +1,7 @@
 /**
  * Parse a WhatsApp .txt export and extract penalty entries.
  *
- * Each returned entry: { rawName, amount, date, originalText }
+ * Each returned entry: { rawName, amount, date, originalText, sender }
  */
 
 const SKIP_PATTERNS = [
@@ -18,25 +18,55 @@ const SKIP_PATTERNS = [
   'Diese Nachricht wurde bearbeitet',
 ]
 
+/**
+ * Phrases that indicate the SENDER themselves did something —
+ * not a third person. The sender's name should be used instead
+ * of treating the phrase as a person name.
+ *
+ * e.g. "Hab mein Maßband verloren 20€" → sender lost the tape measure
+ *      "Ich hab vergessen 2€"          → sender forgot
+ */
+const SELF_REFERENTIAL = [
+  /^hab\s+mein/i,
+  /^ich\s+hab/i,
+  /^ich\s+habe/i,
+  /^habe\s+mein/i,
+  /^mein\s+ma[sß]band/i,
+  /^hab\s+vergessen/i,
+  /^habe\s+vergessen/i,
+]
+
 function parseDate(line) {
   const m = line.match(/^(\d{2})\.(\d{2})\.(\d{2}),\s*\d{2}:\d{2}/)
   if (!m) return null
   return `20${m[3]}-${m[2]}-${m[1]}`
 }
 
-function extractFromSegment(seg, date) {
+function isSelfReferential(text) {
+  return SELF_REFERENTIAL.some(re => re.test(text.trim()))
+}
+
+function extractFromSegment(seg, date, sender) {
   // Clean up edit markers
   const s = seg.replace(/<Diese Nachricht wurde bearbeitet\.?>/gi, '').trim()
   if (!s) return null
 
-  // Pattern A: "Name(s) Betrag€"  →  "Flo Gruber 2€", "Goga 5 €", "Tommy 1euro"
+  // Pattern A: "Name(s) Betrag€"  →  "Flo Gruber 2€", "Goga 5 €"
   let m = s.match(/^(.+?)\s+([\d]+(?:[,.][\d]+)?)\s*[€$&]\s*$/)
   if (!m) m = s.match(/^(.+?)\s+([\d]+(?:[,.][\d]+)?)\s*[Ee]uro\s*$/)
   if (!m) m = s.match(/^(.+?)\s+([\d]+(?:[,.][\d]+)?)\s*[€$&]/)
 
   if (m) {
-    const rawName = m[1].replace(/[*_~`]/g, '').trim()
-    const amount  = parseFloat(m[2].replace(',', '.'))
+    let rawName = m[1].replace(/[*_~`]/g, '').trim()
+    const amount = parseFloat(m[2].replace(',', '.'))
+
+    // If the text is self-referential ("Hab mein Maßband verloren 20€"),
+    // use the sender as the person instead of the phrase
+    if (isSelfReferential(rawName)) {
+      if (!sender) return null
+      rawName = sender
+    }
+
     if (isValidEntry(rawName, amount))
       return { rawName, amount, date, originalText: s }
     return null
@@ -67,7 +97,7 @@ function isValidEntry(name, amount) {
 /**
  * Parse the full chat text.
  * @param {string} text - Raw content of WhatsApp .txt export
- * @returns {Array<{rawName,amount,date,originalText}>}
+ * @returns {Array<{rawName,amount,date,originalText,sender}>}
  */
 export function parseChat(text) {
   const lines = text.split('\n')
@@ -83,15 +113,16 @@ export function parseChat(text) {
 
     if (SKIP_PATTERNS.some(p => after.includes(p))) continue
 
-    // Strip "Sender: " prefix
-    const ci    = after.indexOf(': ')
-    const body  = ci >= 0 ? after.slice(ci + 2).trim() : after.trim()
+    // Extract sender name (before the first ": ")
+    const ci     = after.indexOf(': ')
+    const sender = ci >= 0 ? after.slice(0, ci).trim() : ''
+    const body   = ci >= 0 ? after.slice(ci + 2).trim() : after.trim()
 
-    // Handle multi-line messages (Goga sent several names on separate lines)
+    // Handle multi-line messages
     const segs = body.split('\n')
     for (const seg of segs) {
-      const entry = extractFromSegment(seg, date)
-      if (entry) results.push(entry)
+      const entry = extractFromSegment(seg, date, sender)
+      if (entry) results.push({ ...entry, sender })
     }
   }
 
