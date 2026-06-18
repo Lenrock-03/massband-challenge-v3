@@ -206,8 +206,11 @@ function renderBoard() {
     list.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><p>Noch keine Einträge. Importiere den WhatsApp-Chat im Admin-Bereich.</p></div>`
     return
   }
-  const sort = $id('sort-sel').value
-  const data = active.map(p => ({ ...p, s: pStats(p.id) }))
+  const sort   = $id('sort-sel').value
+  const search = ($id('board-search')?.value || '').toLowerCase()
+  const data = active
+    .filter(p => !search || p.name.toLowerCase().includes(search))
+    .map(p => ({ ...p, s: pStats(p.id) }))
   data.sort((a, b) => {
     if (sort === 'open')  return b.s.open - a.s.open
     if (sort === 'total') return b.s.debt - a.s.debt
@@ -980,6 +983,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab))
   })
   $id('sort-sel').addEventListener('change', renderBoard)
+  $id('board-search').addEventListener('input', renderBoard)
 
   const zone = $id('upload-zone'), inp = $id('file-inp')
   zone.addEventListener('click', () => inp.click())

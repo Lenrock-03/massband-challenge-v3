@@ -80,12 +80,15 @@
 
   <div class="board-header">
     <h2>Rangliste</h2>
-    <select id="sort-sel">
-      <option value="open">Offene Schulden</option>
-      <option value="total">Schulden Gesamt</option>
-      <option value="paid">Eingezahlt</option>
-      <option value="name">Name A–Z</option>
-    </select>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="text" id="board-search" placeholder="🔍 Name suchen…" style="width:160px" />
+      <select id="sort-sel">
+        <option value="open">Offene Schulden</option>
+        <option value="total">Schulden Gesamt</option>
+        <option value="paid">Eingezahlt</option>
+        <option value="name">Name A–Z</option>
+      </select>
+    </div>
   </div>
   <div id="board-list">
     <div class="empty-state">
