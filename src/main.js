@@ -67,7 +67,7 @@ async function saveMappings() { await setDoc(doc(db, 'config', 'mappings'), mapp
 // damit der Matcher nach einem Firestore-Reset sofort funktioniert.
 async function seedHardcodedAliases() {
   // Schon geseedet?
-  if (mappings['__seeded__']) return
+  if (mappings['seeded']) return
 
   const studentList = getStudentList()
   const TEACHER_NAMES_SET = new Set(['frau regus', 'frau wiener', 'herr zimmermann'])
@@ -95,7 +95,7 @@ async function seedHardcodedAliases() {
   if (ops > 0) await batch.commit()
 
   // Marker setzen damit wir das nicht zweimal machen
-  mappings['__seeded__'] = '1'
+  mappings['seeded'] = '1'
   await saveMappings()
 
   toast('Teilnehmerliste initialisiert', 'info')
