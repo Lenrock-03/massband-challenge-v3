@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Maßband-Challenge V3</title>
+  <title>Maßband-Challenge</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/src/style.css" />
 </head>
@@ -43,7 +43,7 @@
 <div id="view-board" class="container hidden">
   <div class="hero">
     <h1>📏 Maßband-Challenge</h1>
-    <p>100 Tage Countdown • Erlöse finanzieren Rabatte auf Abiballkarten</p>
+    <p>Teilnehmer bekommen Freigetränke beim Abiball</p>
   </div>
 
   <div class="countdown-bar">
@@ -65,7 +65,7 @@
 
   <div class="stats-grid">
     <div class="stat-card stat-gold">
-      <div class="stat-label">Gesamtschaden (Pot)</div>
+      <div class="stat-label">Schulden Gesamt (Pot)</div>
       <div class="stat-value" id="s-pot">0,00 €</div>
     </div>
     <div class="stat-card stat-green">
@@ -73,7 +73,7 @@
       <div class="stat-value" id="s-paid">0,00 €</div>
     </div>
     <div class="stat-card stat-red">
-      <div class="stat-label">Offene Beträge</div>
+      <div class="stat-label">Summe Offener Beträge</div>
       <div class="stat-value" id="s-open">0,00 €</div>
     </div>
   </div>
@@ -82,7 +82,7 @@
     <h2>Rangliste</h2>
     <select id="sort-sel">
       <option value="open">Offene Schulden</option>
-      <option value="total">Gesamtschaden</option>
+      <option value="total">Schulden Gesamt</option>
       <option value="paid">Eingezahlt</option>
       <option value="name">Name A–Z</option>
     </select>
