@@ -201,7 +201,7 @@ function updateStats() {
 // ── Leaderboard ───────────────────────────────────────────────────
 function renderBoard() {
   const list   = $id('board-list')
-  const active = persons
+  const active = persons.filter(p => transactions.some(t => t.personId === p.id))
   if (!active.length) {
     list.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><p>Noch keine Einträge. Importiere den WhatsApp-Chat im Admin-Bereich.</p></div>`
     return
