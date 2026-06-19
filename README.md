@@ -98,5 +98,5 @@ Standard-Passwort: **`admin123`**
 - 🧠 **Fuzzy-Matching** — erkennt Spitznamen & Tippfehler automatisch
 - 📚 **Lerneffekt** — bestätigte Matches werden gespeichert
 - 👥 **Neue Personen** — Lehrer/Gäste im Admin hinzufügbar, danach beim Import erkannt
-- 📒 **Hauptbuch** — jeden Eintrag bearbeiten oder löschen
+- 📒 **"Alle Buchungen"** — jeden Eintrag bearbeiten oder löschen
 - 💰 **Zahlungen** — Bareinzahlungen direkt erfassen
