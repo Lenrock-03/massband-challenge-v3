@@ -201,11 +201,11 @@ function updateStats() {
 // ── Leaderboard ───────────────────────────────────────────────────
 function renderBoard() {
   const list   = $id('board-list')
-  const active = persons.filter(p => transactions.some(t => t.personId === p.id))
-  if (!active.length) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><p>Noch keine Einträge. Importiere den WhatsApp-Chat im Admin-Bereich.</p></div>`
-    return
-  }
+  const studentList = getStudentList()
+  const active = persons.filter(p =>
+    transactions.some(t => t.personId === p.id) ||
+    studentList.some(name => name.toLowerCase() === p.name.toLowerCase())
+  )
   const sort   = $id('sort-sel').value
   const search = ($id('board-search')?.value || '').toLowerCase()
   const data = active
