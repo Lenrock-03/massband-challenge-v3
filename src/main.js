@@ -16,6 +16,7 @@ let transactions = []
 let mappings     = {}
 let config       = { abiDate: '2026-04-28', adminPwHash: btoa('admin123') }
 let isAdmin      = false
+let isModerator  = false
 let stagingRows  = []
 let editingId    = null
 let unsubPersons = null
@@ -153,7 +154,17 @@ function showView(v) {
   $id('view-board').classList.toggle('hidden', v !== 'board')
   $id('view-admin').classList.toggle('hidden', v !== 'admin')
   if (v === 'board') { renderBoard(); updateStats(); updateCountdown() }
-  if (v === 'admin') { populateDropdowns(); renderLedger(); renderPersonsList(); renderMappingList() }
+  if (v === 'admin') {
+    populateDropdowns(); renderLedger(); renderPersonsList(); renderMappingList()
+    // Show/hide tabs based on role
+    const modOnlyTabs = ['import', 'persons', 'dedup', 'settings']
+    modOnlyTabs.forEach(tab => {
+      const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`)
+      if (btn) btn.style.display = isModerator ? 'none' : ''
+    })
+    // Default tab for moderator
+    if (isModerator) switchTab('quick')
+  }
 }
 
 function switchTab(name) {
@@ -285,19 +296,37 @@ function closePwModal() {
   $id('pw-err').classList.add('hidden')
 }
 async function checkPw() {
-  const v = $id('pw-input').value
+  const user = $id('pw-user').value.trim().toLowerCase()
+  const v    = $id('pw-input').value
   const hash = await hashPw(v)
-  const stored = config.adminPwHash || ''
-  // Support legacy btoa format for migration
-  const match = hash === stored || btoa(v) === stored
-  if (match) {
-    if (btoa(v) === stored) { config.adminPwHash = hash; await saveConfig() }
-    isAdmin = true; closePwModal(); showView('admin')
-    $id('nav-admin').textContent = '🔓 Admin-Bereich'
-    toast('Admin-Bereich entsperrt', 'ok')
-  } else {
-    $id('pw-err').classList.remove('hidden')
+
+  // Admin login
+  if (user === 'admin') {
+    const stored = config.adminPwHash || ''
+    const match  = hash === stored || btoa(v) === stored
+    if (match) {
+      if (btoa(v) === stored) { config.adminPwHash = hash; await saveConfig() }
+      isAdmin = true; isModerator = false
+      closePwModal(); showView('admin')
+      $id('nav-admin').textContent = '🔓 Admin-Bereich'
+      toast('Als Admin eingeloggt', 'ok')
+      return
+    }
   }
+
+  // Moderator login
+  if (user === 'stufensprecher') {
+    const stored = config.moderatorPwHash || ''
+    if (stored && (hash === stored || btoa(v) === stored)) {
+      isModerator = true; isAdmin = false
+      closePwModal(); showView('admin')
+      $id('nav-admin').textContent = '🔓 Stufensprecher'
+      toast('Als Stufensprecher eingeloggt', 'ok')
+      return
+    }
+  }
+
+  $id('pw-err').classList.remove('hidden')
 }
 
 // ── Dropdowns ─────────────────────────────────────────────────────
@@ -449,10 +478,13 @@ function renderLedger() {
   body.innerHTML = txs.map(t => {
     const p   = persons.find(x => x.id === t.personId)
     const isP = t.type === 'PENALTY'
-    if (editingId === t.id) return `
+    if (editingId === t.id) {
+      const pOpts = [...persons].sort((a,b)=>a.name.localeCompare(b.name,'de'))
+        .map(x => '<option value="'+x.id+'"'+(x.id===t.personId?' selected':'')+'>'+esc(x.name)+'</option>').join('')
+      return `
       <tr style="background:var(--surf2)">
         <td><input type="date" value="${t.date}" id="ed-date" style="width:120px"></td>
-        <td>${esc(p?.name || '?')}</td>
+        <td><select id="ed-person" style="width:160px">${pOpts}</select></td>
         <td><select id="ed-type">
           <option value="PENALTY" ${isP ? 'selected' : ''}>Strafe</option>
           <option value="PAYMENT" ${!isP ? 'selected' : ''}>Zahlung</option>
@@ -465,6 +497,7 @@ function renderLedger() {
           <button class="btn-ghost btn-sm" data-cancel="1">✕</button>
         </td>
       </tr>`
+    }
     return `
       <tr>
         <td>${fmtD(t.date)}</td>
@@ -486,6 +519,7 @@ function renderLedger() {
       await updateDoc(doc(db, 'transactions', b.dataset.save), {
         date: $id('ed-date').value, type: $id('ed-type').value,
         amount: parseFloat($id('ed-amt').value), reason: $id('ed-reason').value,
+        personId: $id('ed-person')?.value || undefined,
       })
       editingId = null; toast('Gespeichert', 'ok')
     })
@@ -948,8 +982,19 @@ async function changePw() {
   if (a.length < 6) return toast('Mindestens 6 Zeichen', 'err')
   config.adminPwHash = await hashPw(a)
   await saveConfig()
-  toast('Passwort geändert', 'ok')
+  toast('Admin-Passwort geändert', 'ok')
   $id('new-pw1').value = ''; $id('new-pw2').value = ''
+}
+
+async function changePwMod() {
+  const a = $id('new-pw-mod1').value, b = $id('new-pw-mod2').value
+  if (!a) return toast('Bitte Passwort eingeben', 'err')
+  if (a !== b) return toast('Passwörter stimmen nicht überein', 'err')
+  if (a.length < 6) return toast('Mindestens 6 Zeichen', 'err')
+  config.moderatorPwHash = await hashPw(a)
+  await saveConfig()
+  toast('Stufensprecher-Passwort geändert', 'ok')
+  $id('new-pw-mod1').value = ''; $id('new-pw-mod2').value = ''
 }
 
 // ── Export ────────────────────────────────────────────────────────
@@ -1018,6 +1063,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $id('data-fixes-btn').addEventListener('click', applyDataFixes)
   $id('abi-save').addEventListener('click', saveAbiDate)
   $id('pw-change').addEventListener('click', changePw)
+  $id('pw-change-mod').addEventListener('click', changePwMod)
   $id('export-csv').addEventListener('click', exportCSV)
   $id('export-json').addEventListener('click', exportJSON)
 

@@ -21,9 +21,10 @@
   <div class="modal">
     <div style="font-size:1.8rem;margin-bottom:10px">🔐</div>
     <h2>Admin-Bereich</h2>
-    <p>Bitte Passwort eingeben</p>
-    <input type="password" id="pw-input" placeholder="••••••••" />
-    <div class="pw-err hidden" id="pw-err">Falsches Passwort</div>
+    <p>Bitte anmelden</p>
+    <input type="text" id="pw-user" placeholder="Benutzername" style="margin-bottom:8px" />
+    <input type="password" id="pw-input" placeholder="Passwort" />
+    <div class="pw-err hidden" id="pw-err">Falscher Benutzername oder Passwort</div>
     <div style="margin-top:14px;display:flex;gap:8px;justify-content:center">
       <button class="btn-gold" id="pw-submit">Entsperren</button>
       <button class="btn-ghost" id="pw-cancel">Abbrechen</button>
@@ -108,7 +109,7 @@
 
   <div class="admin-tabs">
     <button class="tab-btn active" data-tab="import">📤 Chat-Import</button>
-    <button class="tab-btn" data-tab="quick">➕ Quick-Add</button>
+    <button class="tab-btn" data-tab="quick">➕ Manuelle Eingabe</button>
     <button class="tab-btn" data-tab="ledger">📒 Hauptbuch</button>
     <button class="tab-btn" data-tab="persons">👥 Teilnehmer</button>
     <button class="tab-btn" data-tab="dedup">🧹 Bereinigung</button>
@@ -341,7 +342,24 @@
         </div>
       </div>
       <div class="form-actions">
-        <button class="btn-outline" id="pw-change">Passwort ändern</button>
+        <button class="btn-outline" id="pw-change">Admin-Passwort ändern</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Stufensprecher-Passwort ändern</h3>
+      <p class="muted" style="margin-bottom:12px">Benutzername: <strong>Stufensprecher</strong> — hat Zugriff auf Quick-Add und Hauptbuch.</p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Neues Passwort</label>
+          <input type="password" id="new-pw-mod1" placeholder="Neues Passwort" />
+        </div>
+        <div class="form-group">
+          <label>Bestätigen</label>
+          <input type="password" id="new-pw-mod2" placeholder="Wiederholen" />
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-outline" id="pw-change-mod">Stufensprecher-Passwort ändern</button>
       </div>
     </div>
     <div class="card">
