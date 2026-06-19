@@ -479,12 +479,10 @@ function renderLedger() {
     const p   = persons.find(x => x.id === t.personId)
     const isP = t.type === 'PENALTY'
     if (editingId === t.id) {
-      const pOpts = [...persons].sort((a,b)=>a.name.localeCompare(b.name,'de'))
-        .map(x => '<option value="'+x.id+'"'+(x.id===t.personId?' selected':'')+'>'+esc(x.name)+'</option>').join('')
       return `
       <tr style="background:var(--surf2)">
         <td><input type="date" value="${t.date}" id="ed-date" style="width:120px"></td>
-        <td><select id="ed-person" style="width:160px">${pOpts}</select></td>
+        <td id="ed-person-cell"></td>
         <td><select id="ed-type">
           <option value="PENALTY" ${isP ? 'selected' : ''}>Strafe</option>
           <option value="PAYMENT" ${!isP ? 'selected' : ''}>Zahlung</option>
@@ -514,12 +512,23 @@ function renderLedger() {
   }).join('')
   body.querySelectorAll('[data-edit]').forEach(b => { b.addEventListener('click', () => { editingId = b.dataset.edit; renderLedger() }) })
   body.querySelectorAll('[data-cancel]').forEach(b => { b.addEventListener('click', () => { editingId = null; renderLedger() }) })
+  // Mount searchable dropdown for person in edit row
+  const edCell = body.querySelector('#ed-person-cell')
+  if (edCell) {
+    const editTx = transactions.find(t => t.id === editingId)
+    let edPersonId = editTx?.personId || null
+    const ddPerson = createSearchDropdown(persons, edPersonId, (val) => { edPersonId = val })
+    edCell.appendChild(ddPerson)
+  }
+
   body.querySelectorAll('[data-save]').forEach(b => {
     b.addEventListener('click', async () => {
+      const edCell2 = body.querySelector('#ed-person-cell .sd-wrap')
+      const newPersonId = edCell2?._getValue()
       await updateDoc(doc(db, 'transactions', b.dataset.save), {
         date: $id('ed-date').value, type: $id('ed-type').value,
         amount: parseFloat($id('ed-amt').value), reason: $id('ed-reason').value,
-        personId: $id('ed-person')?.value || undefined,
+        ...(newPersonId ? { personId: newPersonId } : {}),
       })
       editingId = null; toast('Gespeichert', 'ok')
     })
