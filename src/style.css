@@ -288,51 +288,45 @@ tr:hover td { background: rgba(255,255,255,.02); }
 /* ── Mobile fixes ─────────────────────────────────────────── */
 @media (max-width: 600px) {
 
-  /* Stats nebeneinander statt übereinander */
   .stats-grid {
     display: grid;
     grid-template-columns: 1fr;
     gap: 8px;
   }
 
-  /* Board header: Suche + Filter untereinander aber kompakt */
+  /* Board header: Suche oben, Filter+Sort darunter nebeneinander */
   .board-header {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
+    align-items: stretch;
+    gap: 6px;
   }
   .board-header > div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
     width: 100%;
-    flex-wrap: wrap;
+    align-items: center;
   }
-  .board-header select,
+  /* Suchfeld volle Breite */
   .board-header input {
-    flex: 1;
-    min-width: 0;
+    grid-column: 1 / -1;
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+  /* Labels verstecken auf Handy */
+  .board-header label {
+    display: none;
+  }
+  /* Dropdowns volle Breite ihrer Zelle */
+  .board-header select {
+    width: 100% !important;
+    box-sizing: border-box;
   }
 
   /* Personenkarte: Beträge kompakter */
-  .person-row {
-    flex-wrap: nowrap;
-    gap: 4px;
-  }
-  .person-name {
-    font-size: 13px;
-    flex: 1;
-    min-width: 0;
-  }
-  .amounts {
-    gap: 6px;
-  }
-  .amount-col .val {
-    font-size: 12px;
-  }
-  .amount-col .lbl {
-    font-size: 9px;
-  }
-
-  /* €-Zeichen nicht umbrechen */
-  .val {
-    white-space: nowrap;
-  }
+  .person-row { gap: 4px; }
+  .person-name { font-size: 13px; flex: 1; min-width: 0; }
+  .amounts { gap: 6px; }
+  .amount-col .val { font-size: 12px; white-space: nowrap; }
+  .amount-col .lbl { font-size: 9px; }
 }
