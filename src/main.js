@@ -311,6 +311,28 @@ async function hashPw(pw) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+// ── Discord Notifications ────────────────────────────
+const DISCORD_WEBHOOK = import.meta.env.VITE_DISCORD_WEBHOOK
+
+async function discordNotify(title, description, color = 0xf59e0b) {
+  if (!DISCORD_WEBHOOK) return
+  try {
+    await fetch(DISCORD_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title,
+          description,
+          color,
+          timestamp: new Date().toISOString(),
+          footer: { text: 'Maßband-Challenge' }
+        }]
+      })
+    })
+  } catch (_) {}
+}
+
 // ── Password ──────────────────────────────────────────────────────
 function openAdmin() {
   if (isAdmin) { showView('admin'); return }
@@ -337,6 +359,7 @@ async function checkPw() {
       closePwModal(); showView('admin')
       $id('nav-admin').textContent = '🔓 Admin-Bereich'
       toast('Als Admin eingeloggt', 'ok')
+      discordNotify('🔓 Admin-Login', 'Jemand hat sich als **Admin** eingeloggt.', 0xf59e0b)
       return
     }
   }
@@ -349,6 +372,7 @@ async function checkPw() {
       closePwModal(); showView('admin')
       $id('nav-admin').textContent = '🔓 Stufensprecher'
       toast('Als Stufensprecher eingeloggt', 'ok')
+      discordNotify('👥 Stufensprecher-Login', 'Jemand hat sich als **Stufensprecher** eingeloggt.', 0x3b82f6)
       return
     }
   }
@@ -386,6 +410,8 @@ async function addPenalty() {
     date: date || today(), source: 'MANUAL', originalText: '', sender: '',
     createdAt: serverTimestamp(),
   })
+  const pName = persons.find(p => p.id === pid)?.name || pid
+  discordNotify('📛 Strafe eingetragen', `**${pName}** wurde eine Strafe von **${fmt(amt)}** eingetragen.\nGrund: ${reason || 'Sonstiges'}${note ? ' — ' + note : ''}`, 0xef4444)
   toast('Strafe gespeichert', 'ok')
   ;[$id('qa-person'), $id('qa-reason'), $id('qa-note')].forEach(el => { el.value = '' })
   $id('qa-amt').value = ''
@@ -404,6 +430,8 @@ async function addPayment() {
     date: date || today(), source: 'MANUAL', originalText: '', sender: '',
     createdAt: serverTimestamp(),
   })
+  const payName = persons.find(p => p.id === pid)?.name || pid
+  discordNotify('✅ Zahlung erfasst', `**${payName}** hat **${fmt(amt)}** eingezahlt.${note ? '\nNotiz: ' + note : ''}`, 0x22c55e)
   toast('Zahlung gespeichert', 'ok')
   ;[$id('pay-person'), $id('pay-note')].forEach(el => { el.value = '' })
   $id('pay-amt').value = ''
@@ -1005,6 +1033,7 @@ async function confirmImport() {
   await batch.commit()
   if (newMappings) await saveMappings()
   clearStaging()
+  discordNotify('📤 Chat-Import', `**${toImport.length}** Einträge importiert, ${stagingRows.length - toImport.length} übersprungen.`, 0xf59e0b)
   toast(`${toImport.length} importiert, ${stagingRows.length - toImport.length} übersprungen`, 'ok')
 }
 
