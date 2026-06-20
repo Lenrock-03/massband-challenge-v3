@@ -237,8 +237,16 @@ function renderBoard() {
   )
   const sort   = $id('sort-sel').value
   const search = ($id('board-search')?.value || '').toLowerCase()
+  const filter = $id('board-filter')?.value || 'all'
   const data = active
     .filter(p => !search || p.name.toLowerCase().includes(search))
+    .filter(p => {
+      if (filter === 'all')        return true
+      if (filter === 'teacher')    return p.type === 'teacher'
+      if (filter === 'teilnehmer') return isTeilnehmer(p.name)
+      if (filter === 'student')    return p.type !== 'teacher' && !isTeilnehmer(p.name)
+      return true
+    })
     .map(p => ({ ...p, s: pStats(p.id) }))
   data.sort((a, b) => {
     if (sort === 'open')  return b.s.open - a.s.open
@@ -1058,6 +1066,7 @@ document.addEventListener('DOMContentLoaded', () => {
   })
   $id('sort-sel').addEventListener('change', renderBoard)
   $id('board-search').addEventListener('input', renderBoard)
+  $id('board-filter').addEventListener('change', renderBoard)
 
   const zone = $id('upload-zone'), inp = $id('file-inp')
   zone.addEventListener('click', () => inp.click())

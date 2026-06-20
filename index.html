@@ -82,9 +82,17 @@
 
   <div class="board-header">
     <h2>Rangliste</h2>
-    <div style="display:flex;gap:8px;align-items:center">
-      <input type="text" id="board-search" placeholder="🔍 Name suchen…" style="width:160px" />
-      <select id="sort-sel">
+    <div style="display:flex;gap:6px;align-items:center;white-space:nowrap">
+      <input type="text" id="board-search" placeholder="🔍 Name…" style="width:130px" />
+      <label style="font-size:11px;color:var(--muted)">Filter:</label>
+      <select id="board-filter" style="width:120px">
+        <option value="all">Alle</option>
+        <option value="teilnehmer">Teilnehmer</option>
+        <option value="teacher">Lehrkraft</option>
+        <option value="student">Ohne Badge</option>
+      </select>
+      <label style="font-size:11px;color:var(--muted)">Sortierung:</label>
+      <select id="sort-sel" style="width:150px">
         <option value="open">Offene Schulden</option>
         <option value="total">Schulden Gesamt</option>
         <option value="paid">Eingezahlt</option>
