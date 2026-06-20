@@ -22,6 +22,7 @@ let editingId    = null
 let unsubPersons = null
 let unsubTx      = null
 let stagingVP    = []
+let teilnehmerSet = new Set()
 
 // ── Utils ─────────────────────────────────────────────────────────
 const fmt  = n => n.toFixed(2).replace('.', ',') + ' €'
@@ -133,10 +134,27 @@ function subscribeTx() {
   )
 }
 
+// ── Teilnehmer CSV ─────────────────────────────
+async function loadTeilnehmer() {
+  try {
+    const res  = await fetch('/data/teilnehmer.csv')
+    const text = await res.text()
+    teilnehmerSet = new Set(
+      text.split('\n')
+        .map(l => l.replace(/;/g, '').trim().toLowerCase())
+        .filter(Boolean)
+    )
+  } catch (_) { teilnehmerSet = new Set() }
+}
+
+function isTeilnehmer(name) {
+  return teilnehmerSet.has(name.toLowerCase())
+}
+
 // ── Boot ──────────────────────────────────────────────────────────
 async function boot() {
   try {
-    await Promise.all([loadConfig(), loadMappings()])
+    await Promise.all([loadConfig(), loadMappings(), loadTeilnehmer()])
     subscribePersons()
     subscribeTx()
     $id('loading').style.display = 'none'
@@ -233,7 +251,8 @@ function renderBoard() {
     const txs   = transactions.filter(t => t.personId === p.id)
     const rc    = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : ''
     const badge = p.type === 'teacher' ? '<span class="badge badge-lehrer">Lehrkraft</span>'
-                : p.type === 'guest'   ? '<span class="badge badge-gast">Gast</span>' : ''
+                : p.type === 'guest'   ? '<span class="badge badge-gast">Gast</span>'
+                : isTeilnehmer(p.name) ? '<span class="badge badge-teilnehmer">Teilnehmer</span>' : ''
 
     const txHtml = txs.length
       ? txs.map(t => {
@@ -406,7 +425,8 @@ function renderPersonsList() {
   el.innerHTML = sorted.map(p => {
     const s = pStats(p.id)
     const badge = p.type === 'teacher' ? '<span class="badge badge-lehrer">Lehrkraft</span>'
-                : p.type === 'guest'   ? '<span class="badge badge-gast">Gast</span>' : ''
+                : p.type === 'guest'   ? '<span class="badge badge-gast">Gast</span>'
+                : isTeilnehmer(p.name) ? '<span class="badge badge-teilnehmer">Teilnehmer</span>' : ''
     return `
       <div class="flex-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
         <span>${esc(p.name)}${badge}</span>

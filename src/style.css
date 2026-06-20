@@ -154,6 +154,7 @@ button { cursor: pointer; border: none; border-radius: var(--rs); font-size: 14p
 .badge { font-size: 10px; padding: 2px 6px; border-radius: 99px; font-weight: 600; margin-left: 5px; }
 .badge-lehrer { background: #1a3a5c; color: #58a6ff; }
 .badge-gast   { background: #2a1f3d; color: #a78bfa; }
+.badge-teilnehmer { background: rgba(239,68,68,.15); color: #f87171; border: 1px solid rgba(239,68,68,.3); }
 
 .amounts { display: flex; gap: 18px; text-align: right; }
 .amount-col .lbl { font-size: 10px; color: var(--muted); }
