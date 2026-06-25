@@ -78,25 +78,32 @@
     </div>
   </div>
 
-  <div class="board-header">
-    <h2>Rangliste</h2>
-    <div style="display:flex;gap:8px;align-items:center">
-      <input type="text" id="board-search" placeholder="🔍 Name suchen…" style="width:160px" />
-      <select id="sort-sel">
-        <option value="open">Offene Schulden</option>
-        <option value="total">Schulden Gesamt</option>
-        <option value="paid">Eingezahlt</option>
-        <option value="name">Name A–Z</option>
-      </select>
+    <div class="board-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:8px;margin-bottom:4px">
+        <h2 style="margin:0">Rangliste</h2>
+        <a href="https://paypal.me/DEIN-PAYPAL-LINK" target="_blank" rel="noopener" class="btn-gold" style="text-decoration:none;font-size:13px">
+          💸 Jetzt einzahlen
+        </a>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;white-space:nowrap">
+        <input type="text" id="board-search" placeholder="🔍 Name…" style="width:130px" />
+        <label style="font-size:11px;color:var(--muted)">Filter:</label>
+        <select id="board-filter" style="width:120px">
+          <option value="all">Alle</option>
+          <option value="teilnehmer">Teilnehmer</option>
+          <option value="teacher">Lehrkraft</option>
+          <option value="student">Ohne Badge</option>
+        </select>
+        <label style="font-size:11px;color:var(--muted)">Sortierung:</label>
+        <select id="sort-sel" style="width:150px">
+          <option value="open">Offene Schulden</option>
+          <option value="total">Schulden Gesamt</option>
+          <option value="paid">Eingezahlt</option>
+          <option value="name">Name A–Z</option>
+        </select>
+      </div>
     </div>
-  </div>
-  <div id="board-list">
-    <div class="empty-state">
-      <div class="empty-icon">📋</div>
-      <p>Noch keine Einträge. Importiere den WhatsApp-Chat im Admin-Bereich.</p>
-    </div>
-  </div>
-</div>
+
 
 <!-- ══ ADMIN ════════════════════════════════════════════════════ -->
 <div id="view-admin" class="container hidden">
