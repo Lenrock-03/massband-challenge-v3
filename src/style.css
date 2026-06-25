@@ -154,6 +154,7 @@ button { cursor: pointer; border: none; border-radius: var(--rs); font-size: 14p
 .badge { font-size: 10px; padding: 2px 6px; border-radius: 99px; font-weight: 600; margin-left: 5px; }
 .badge-lehrer { background: #1a3a5c; color: #58a6ff; }
 .badge-gast   { background: #2a1f3d; color: #a78bfa; }
+.badge-teilnehmer { background: rgba(239,68,68,.15); color: #f87171; border: 1px solid rgba(239,68,68,.3); }
 
 .amounts { display: flex; gap: 18px; text-align: right; }
 .amount-col .lbl { font-size: 10px; color: var(--muted); }
@@ -282,4 +283,50 @@ tr:hover td { background: rgba(255,255,255,.02); }
   .form-grid  { grid-template-columns: 1fr; }
   .amounts    { gap: 10px; }
   .admin-tabs { overflow-x: auto; }
+}
+
+/* ── Mobile fixes ─────────────────────────────────────────── */
+@media (max-width: 600px) {
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* Board header: Suche oben, Filter+Sort darunter nebeneinander */
+  .board-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .board-header > div {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+    align-items: center;
+  }
+  /* Suchfeld volle Breite */
+  .board-header input {
+    grid-column: 1 / -1;
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+  /* Labels verstecken auf Handy */
+  .board-header label {
+    display: none;
+  }
+  /* Dropdowns volle Breite ihrer Zelle */
+  .board-header select {
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  /* Personenkarte: Beträge kompakter */
+  .person-row { gap: 4px; }
+  .person-name { font-size: 13px; flex: 1; min-width: 0; }
+  .amounts { gap: 6px; }
+  .amount-col .val { font-size: 12px; white-space: nowrap; }
+  .amount-col .lbl { font-size: 9px; }
 }

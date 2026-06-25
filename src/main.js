@@ -16,11 +16,13 @@ let transactions = []
 let mappings     = {}
 let config       = { abiDate: '2026-04-28', adminPwHash: btoa('admin123') }
 let isAdmin      = false
+let isModerator  = false
 let stagingRows  = []
 let editingId    = null
 let unsubPersons = null
 let unsubTx      = null
 let stagingVP    = []
+let teilnehmerSet = new Set()
 
 // ── Utils ─────────────────────────────────────────────────────────
 const fmt  = n => n.toFixed(2).replace('.', ',') + ' €'
@@ -67,7 +69,7 @@ async function saveMappings() { await setDoc(doc(db, 'config', 'mappings'), mapp
 // damit der Matcher nach einem Firestore-Reset sofort funktioniert.
 async function seedHardcodedAliases() {
   // Schon geseedet?
-  if (mappings['__seeded__']) return
+  if (mappings['seeded']) return
 
   const studentList = getStudentList()
   const TEACHER_NAMES_SET = new Set(['frau regus', 'frau wiener', 'herr zimmermann'])
@@ -95,7 +97,7 @@ async function seedHardcodedAliases() {
   if (ops > 0) await batch.commit()
 
   // Marker setzen damit wir das nicht zweimal machen
-  mappings['__seeded__'] = '1'
+  mappings['seeded'] = '1'
   await saveMappings()
 
   toast('Teilnehmerliste initialisiert', 'info')
@@ -132,10 +134,27 @@ function subscribeTx() {
   )
 }
 
+// ── Teilnehmer CSV ─────────────────────────────
+async function loadTeilnehmer() {
+  try {
+    const res  = await fetch('/data/teilnehmer.csv')
+    const text = await res.text()
+    teilnehmerSet = new Set(
+      text.split('\n')
+        .map(l => l.replace(/;/g, '').trim().toLowerCase())
+        .filter(Boolean)
+    )
+  } catch (_) { teilnehmerSet = new Set() }
+}
+
+function isTeilnehmer(name) {
+  return teilnehmerSet.has(name.toLowerCase())
+}
+
 // ── Boot ──────────────────────────────────────────────────────────
 async function boot() {
   try {
-    await Promise.all([loadConfig(), loadMappings()])
+    await Promise.all([loadConfig(), loadMappings(), loadTeilnehmer()])
     subscribePersons()
     subscribeTx()
     $id('loading').style.display = 'none'
@@ -153,7 +172,17 @@ function showView(v) {
   $id('view-board').classList.toggle('hidden', v !== 'board')
   $id('view-admin').classList.toggle('hidden', v !== 'admin')
   if (v === 'board') { renderBoard(); updateStats(); updateCountdown() }
-  if (v === 'admin') { populateDropdowns(); renderLedger(); renderPersonsList(); renderMappingList() }
+  if (v === 'admin') {
+    populateDropdowns(); renderLedger(); renderPersonsList(); renderMappingList()
+    // Show/hide tabs based on role
+    const modOnlyTabs = ['import', 'persons', 'dedup', 'settings']
+    modOnlyTabs.forEach(tab => {
+      const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`)
+      if (btn) btn.style.display = isModerator ? 'none' : ''
+    })
+    // Default tab for moderator
+    if (isModerator) switchTab('quick')
+  }
 }
 
 function switchTab(name) {
@@ -201,15 +230,23 @@ function updateStats() {
 // ── Leaderboard ───────────────────────────────────────────────────
 function renderBoard() {
   const list   = $id('board-list')
-  const active = persons.filter(p => transactions.some(t => t.personId === p.id))
-  if (!active.length) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><p>Noch keine Einträge. Importiere den WhatsApp-Chat im Admin-Bereich.</p></div>`
-    return
-  }
+  const studentList = getStudentList()
+  const active = persons.filter(p =>
+    transactions.some(t => t.personId === p.id) ||
+    studentList.some(name => name.toLowerCase() === p.name.toLowerCase())
+  )
   const sort   = $id('sort-sel').value
   const search = ($id('board-search')?.value || '').toLowerCase()
+  const filter = $id('board-filter')?.value || 'all'
   const data = active
     .filter(p => !search || p.name.toLowerCase().includes(search))
+    .filter(p => {
+      if (filter === 'all')        return true
+      if (filter === 'teacher')    return p.type === 'teacher'
+      if (filter === 'teilnehmer') return isTeilnehmer(p.name)
+      if (filter === 'student')    return p.type !== 'teacher' && !isTeilnehmer(p.name)
+      return true
+    })
     .map(p => ({ ...p, s: pStats(p.id) }))
   data.sort((a, b) => {
     if (sort === 'open')  return b.s.open - a.s.open
@@ -222,7 +259,8 @@ function renderBoard() {
     const txs   = transactions.filter(t => t.personId === p.id)
     const rc    = i === 0 ? 'r1' : i === 1 ? 'r2' : i === 2 ? 'r3' : ''
     const badge = p.type === 'teacher' ? '<span class="badge badge-lehrer">Lehrkraft</span>'
-                : p.type === 'guest'   ? '<span class="badge badge-gast">Gast</span>' : ''
+                : p.type === 'guest'   ? '<span class="badge badge-gast">Gast</span>'
+                : isTeilnehmer(p.name) ? '<span class="badge badge-teilnehmer">Teilnehmer</span>' : ''
 
     const txHtml = txs.length
       ? txs.map(t => {
@@ -273,6 +311,28 @@ async function hashPw(pw) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+// ── Discord Notifications ────────────────────────────
+const DISCORD_WEBHOOK = import.meta.env.VITE_DISCORD_WEBHOOK
+
+async function discordNotify(title, description, color = 0xf59e0b) {
+  if (!DISCORD_WEBHOOK) return
+  try {
+    await fetch(DISCORD_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        embeds: [{
+          title,
+          description,
+          color,
+          timestamp: new Date().toISOString(),
+          footer: { text: 'Maßband-Challenge' }
+        }]
+      })
+    })
+  } catch (_) {}
+}
+
 // ── Password ──────────────────────────────────────────────────────
 function openAdmin() {
   if (isAdmin) { showView('admin'); return }
@@ -285,19 +345,39 @@ function closePwModal() {
   $id('pw-err').classList.add('hidden')
 }
 async function checkPw() {
-  const v = $id('pw-input').value
+  const user = $id('pw-user').value.trim().toLowerCase()
+  const v    = $id('pw-input').value
   const hash = await hashPw(v)
-  const stored = config.adminPwHash || ''
-  // Support legacy btoa format for migration
-  const match = hash === stored || btoa(v) === stored
-  if (match) {
-    if (btoa(v) === stored) { config.adminPwHash = hash; await saveConfig() }
-    isAdmin = true; closePwModal(); showView('admin')
-    $id('nav-admin').textContent = '🔓 Admin-Bereich'
-    toast('Admin-Bereich entsperrt', 'ok')
-  } else {
-    $id('pw-err').classList.remove('hidden')
+
+  // Admin login
+  if (user === 'admin') {
+    const stored = config.adminPwHash || ''
+    const match  = hash === stored || btoa(v) === stored
+    if (match) {
+      if (btoa(v) === stored) { config.adminPwHash = hash; await saveConfig() }
+      isAdmin = true; isModerator = false
+      closePwModal(); showView('admin')
+      $id('nav-admin').textContent = '🔓 Admin-Bereich'
+      toast('Als Admin eingeloggt', 'ok')
+      discordNotify('🔓 Admin-Login', 'Jemand hat sich als **Admin** eingeloggt.', 0xf59e0b)
+      return
+    }
   }
+
+  // Moderator login
+  if (user === 'stufensprecher') {
+    const stored = config.moderatorPwHash || ''
+    if (stored && (hash === stored || btoa(v) === stored)) {
+      isModerator = true; isAdmin = false
+      closePwModal(); showView('admin')
+      $id('nav-admin').textContent = '🔓 Stufensprecher'
+      toast('Als Stufensprecher eingeloggt', 'ok')
+      discordNotify('👥 Stufensprecher-Login', 'Jemand hat sich als **Stufensprecher** eingeloggt.', 0x3b82f6)
+      return
+    }
+  }
+
+  $id('pw-err').classList.remove('hidden')
 }
 
 // ── Dropdowns ─────────────────────────────────────────────────────
@@ -330,6 +410,8 @@ async function addPenalty() {
     date: date || today(), source: 'MANUAL', originalText: '', sender: '',
     createdAt: serverTimestamp(),
   })
+  const pName = persons.find(p => p.id === pid)?.name || pid
+  discordNotify('📛 Strafe eingetragen', `**${pName}** wurde eine Strafe von **${fmt(amt)}** eingetragen.\nGrund: ${reason || 'Sonstiges'}${note ? ' — ' + note : ''}`, 0xef4444)
   toast('Strafe gespeichert', 'ok')
   ;[$id('qa-person'), $id('qa-reason'), $id('qa-note')].forEach(el => { el.value = '' })
   $id('qa-amt').value = ''
@@ -348,6 +430,8 @@ async function addPayment() {
     date: date || today(), source: 'MANUAL', originalText: '', sender: '',
     createdAt: serverTimestamp(),
   })
+  const payName = persons.find(p => p.id === pid)?.name || pid
+  discordNotify('✅ Zahlung erfasst', `**${payName}** hat **${fmt(amt)}** eingezahlt.${note ? '\nNotiz: ' + note : ''}`, 0x22c55e)
   toast('Zahlung gespeichert', 'ok')
   ;[$id('pay-person'), $id('pay-note')].forEach(el => { el.value = '' })
   $id('pay-amt').value = ''
@@ -377,7 +461,8 @@ function renderPersonsList() {
   el.innerHTML = sorted.map(p => {
     const s = pStats(p.id)
     const badge = p.type === 'teacher' ? '<span class="badge badge-lehrer">Lehrkraft</span>'
-                : p.type === 'guest'   ? '<span class="badge badge-gast">Gast</span>' : ''
+                : p.type === 'guest'   ? '<span class="badge badge-gast">Gast</span>'
+                : isTeilnehmer(p.name) ? '<span class="badge badge-teilnehmer">Teilnehmer</span>' : ''
     return `
       <div class="flex-between" style="padding:7px 0;border-bottom:1px solid var(--border)">
         <span>${esc(p.name)}${badge}</span>
@@ -449,10 +534,11 @@ function renderLedger() {
   body.innerHTML = txs.map(t => {
     const p   = persons.find(x => x.id === t.personId)
     const isP = t.type === 'PENALTY'
-    if (editingId === t.id) return `
+    if (editingId === t.id) {
+      return `
       <tr style="background:var(--surf2)">
         <td><input type="date" value="${t.date}" id="ed-date" style="width:120px"></td>
-        <td>${esc(p?.name || '?')}</td>
+        <td id="ed-person-cell"></td>
         <td><select id="ed-type">
           <option value="PENALTY" ${isP ? 'selected' : ''}>Strafe</option>
           <option value="PAYMENT" ${!isP ? 'selected' : ''}>Zahlung</option>
@@ -465,6 +551,7 @@ function renderLedger() {
           <button class="btn-ghost btn-sm" data-cancel="1">✕</button>
         </td>
       </tr>`
+    }
     return `
       <tr>
         <td>${fmtD(t.date)}</td>
@@ -481,11 +568,23 @@ function renderLedger() {
   }).join('')
   body.querySelectorAll('[data-edit]').forEach(b => { b.addEventListener('click', () => { editingId = b.dataset.edit; renderLedger() }) })
   body.querySelectorAll('[data-cancel]').forEach(b => { b.addEventListener('click', () => { editingId = null; renderLedger() }) })
+  // Mount searchable dropdown for person in edit row
+  const edCell = body.querySelector('#ed-person-cell')
+  if (edCell) {
+    const editTx = transactions.find(t => t.id === editingId)
+    let edPersonId = editTx?.personId || null
+    const ddPerson = createSearchDropdown(persons, edPersonId, (val) => { edPersonId = val })
+    edCell.appendChild(ddPerson)
+  }
+
   body.querySelectorAll('[data-save]').forEach(b => {
     b.addEventListener('click', async () => {
+      const edCell2 = body.querySelector('#ed-person-cell .sd-wrap')
+      const newPersonId = edCell2?._getValue()
       await updateDoc(doc(db, 'transactions', b.dataset.save), {
         date: $id('ed-date').value, type: $id('ed-type').value,
         amount: parseFloat($id('ed-amt').value), reason: $id('ed-reason').value,
+        ...(newPersonId ? { personId: newPersonId } : {}),
       })
       editingId = null; toast('Gespeichert', 'ok')
     })
@@ -934,6 +1033,7 @@ async function confirmImport() {
   await batch.commit()
   if (newMappings) await saveMappings()
   clearStaging()
+  discordNotify('📤 Chat-Import', `**${toImport.length}** Einträge importiert, ${stagingRows.length - toImport.length} übersprungen.`, 0xf59e0b)
   toast(`${toImport.length} importiert, ${stagingRows.length - toImport.length} übersprungen`, 'ok')
 }
 
@@ -948,8 +1048,19 @@ async function changePw() {
   if (a.length < 6) return toast('Mindestens 6 Zeichen', 'err')
   config.adminPwHash = await hashPw(a)
   await saveConfig()
-  toast('Passwort geändert', 'ok')
+  toast('Admin-Passwort geändert', 'ok')
   $id('new-pw1').value = ''; $id('new-pw2').value = ''
+}
+
+async function changePwMod() {
+  const a = $id('new-pw-mod1').value, b = $id('new-pw-mod2').value
+  if (!a) return toast('Bitte Passwort eingeben', 'err')
+  if (a !== b) return toast('Passwörter stimmen nicht überein', 'err')
+  if (a.length < 6) return toast('Mindestens 6 Zeichen', 'err')
+  config.moderatorPwHash = await hashPw(a)
+  await saveConfig()
+  toast('Stufensprecher-Passwort geändert', 'ok')
+  $id('new-pw-mod1').value = ''; $id('new-pw-mod2').value = ''
 }
 
 // ── Export ────────────────────────────────────────────────────────
@@ -984,6 +1095,7 @@ document.addEventListener('DOMContentLoaded', () => {
   })
   $id('sort-sel').addEventListener('change', renderBoard)
   $id('board-search').addEventListener('input', renderBoard)
+  $id('board-filter').addEventListener('change', renderBoard)
 
   const zone = $id('upload-zone'), inp = $id('file-inp')
   zone.addEventListener('click', () => inp.click())
@@ -1018,6 +1130,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $id('data-fixes-btn').addEventListener('click', applyDataFixes)
   $id('abi-save').addEventListener('click', saveAbiDate)
   $id('pw-change').addEventListener('click', changePw)
+  $id('pw-change-mod').addEventListener('click', changePwMod)
   $id('export-csv').addEventListener('click', exportCSV)
   $id('export-json').addEventListener('click', exportJSON)
 

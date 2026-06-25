@@ -22,9 +22,6 @@ const SKIP_PATTERNS = [
  * Phrases that indicate the SENDER themselves did something —
  * not a third person. The sender's name should be used instead
  * of treating the phrase as a person name.
- *
- * e.g. "Hab mein Maßband verloren 20€" → sender lost the tape measure
- *      "Ich hab vergessen 2€"          → sender forgot
  */
 const SELF_REFERENTIAL = [
   /^hab\s+mein/i,
@@ -36,8 +33,10 @@ const SELF_REFERENTIAL = [
   /^habe\s+vergessen/i,
 ]
 
+const DATE_RE = /^(\d{2})\.(\d{2})\.(\d{2}),\s*\d{2}:\d{2}/
+
 function parseDate(line) {
-  const m = line.match(/^(\d{2})\.(\d{2})\.(\d{2}),\s*\d{2}:\d{2}/)
+  const m = line.match(DATE_RE)
   if (!m) return null
   return `20${m[3]}-${m[2]}-${m[1]}`
 }
@@ -47,11 +46,10 @@ function isSelfReferential(text) {
 }
 
 function extractFromSegment(seg, date, sender) {
-  // Clean up edit markers
   const s = seg.replace(/<Diese Nachricht wurde bearbeitet\.?>/gi, '').trim()
   if (!s) return null
 
-  // Pattern A: "Name(s) Betrag€"  →  "Flo Gruber 2€", "Goga 5 €"
+  // Pattern A: "Name Betrag€"
   let m = s.match(/^(.+?)\s+([\d]+(?:[,.][\d]+)?)\s*[€$&]\s*$/)
   if (!m) m = s.match(/^(.+?)\s+([\d]+(?:[,.][\d]+)?)\s*[Ee]uro\s*$/)
   if (!m) m = s.match(/^(.+?)\s+([\d]+(?:[,.][\d]+)?)\s*[€$&]/)
@@ -59,20 +57,16 @@ function extractFromSegment(seg, date, sender) {
   if (m) {
     let rawName = m[1].replace(/[*_~`]/g, '').trim()
     const amount = parseFloat(m[2].replace(',', '.'))
-
-    // If the text is self-referential ("Hab mein Maßband verloren 20€"),
-    // use the sender as the person instead of the phrase
     if (isSelfReferential(rawName)) {
       if (!sender) return null
       rawName = sender
     }
-
     if (isValidEntry(rawName, amount))
       return { rawName, amount, date, originalText: s }
     return null
   }
 
-  // Pattern B: "Betrag€ Name"  →  "2€ Emma"
+  // Pattern B: "Betrag€ Name"
   m = s.match(/^([\d]+(?:[,.][\d]+)?)\s*[€$&]\s+(.+)$/)
   if (m) {
     const rawName = m[2].replace(/[*_~`]/g, '').trim()
@@ -96,6 +90,10 @@ function isValidEntry(name, amount) {
 
 /**
  * Parse the full chat text.
+ * Handles both single-line and multi-line WhatsApp messages.
+ * Multi-line messages (continuation lines without a date prefix)
+ * inherit the date and sender from the previous dated line.
+ *
  * @param {string} text - Raw content of WhatsApp .txt export
  * @returns {Array<{rawName,amount,date,originalText,sender}>}
  */
@@ -103,26 +101,42 @@ export function parseChat(text) {
   const lines = text.split('\n')
   const results = []
 
+  let currentDate   = null
+  let currentSender = ''
+
   for (const line of lines) {
-    const date = parseDate(line)
-    if (!date) continue
+    const trimmed = line.replace(/\r$/, '') // strip CRLF if present
 
-    const dashIdx = line.indexOf(' - ')
-    if (dashIdx < 0) continue
-    const after = line.slice(dashIdx + 3)
+    const date = parseDate(trimmed)
 
-    if (SKIP_PATTERNS.some(p => after.includes(p))) continue
+    if (date) {
+      // ── Dated line ────────────────────────────────────────────
+      currentDate = date
 
-    // Extract sender name (before the first ": ")
-    const ci     = after.indexOf(': ')
-    const sender = ci >= 0 ? after.slice(0, ci).trim() : ''
-    const body   = ci >= 0 ? after.slice(ci + 2).trim() : after.trim()
+      const dashIdx = trimmed.indexOf(' - ')
+      if (dashIdx < 0) continue
+      const after = trimmed.slice(dashIdx + 3)
 
-    // Handle multi-line messages
-    const segs = body.split('\n')
-    for (const seg of segs) {
-      const entry = extractFromSegment(seg, date, sender)
-      if (entry) results.push({ ...entry, sender })
+      if (SKIP_PATTERNS.some(p => after.includes(p))) {
+        currentSender = ''
+        continue
+      }
+
+      const ci      = after.indexOf(': ')
+      currentSender = ci >= 0 ? after.slice(0, ci).trim() : ''
+      const body    = ci >= 0 ? after.slice(ci + 2).trim() : after.trim()
+
+      // First segment on the same line
+      for (const seg of body.split('\n')) {
+        const entry = extractFromSegment(seg.trim(), currentDate, currentSender)
+        if (entry) results.push({ ...entry, sender: currentSender })
+      }
+
+    } else if (trimmed && currentDate && !SKIP_PATTERNS.some(p => trimmed.includes(p))) {
+      // ── Continuation line (no date prefix) ───────────────────
+      // This is the rest of a multi-line message — same date & sender
+      const entry = extractFromSegment(trimmed, currentDate, currentSender)
+      if (entry) results.push({ ...entry, sender: currentSender })
     }
   }
 
